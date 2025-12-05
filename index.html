@@ -1,0 +1,436 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="UTF-8" />
+    <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1, shrink-to-fit=no"
+    />
+    <title>Stlite app</title>
+    <link
+      rel="stylesheet"
+      href="https://cdn.jsdelivr.net/npm/@stlite/browser@0.90.3/build/stlite.css"
+    />
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module">
+import { mount } from "https://cdn.jsdelivr.net/npm/@stlite/browser@0.90.3/build/stlite.js"
+mount(
+  {
+    requirements: ["altair", "pandas", "streamlit", "plotly"],
+    entrypoint: "streamlit_app.py",
+    files: {
+"streamlit_app.py": `################################################################################
+# STREAMLIT APP: MONITORING DIGITAL MARKETING KULINER PADANG PANJANG 2025
+# SATU FILE - SIAP JALANKAN
+################################################################################
+
+import streamlit as st
+import pandas as pd
+import numpy as np
+import plotly.graph_objects as go
+import plotly.express as px
+from datetime import datetime
+
+################################################################################
+# PAGE CONFIG
+################################################################################
+st.set_page_config(
+    page_title="Digital Marketing Monitor 2025 - Pasar Kuliner Padang Panjang",
+    page_icon="🍜",
+    layout="wide",
+    initial_sidebar_state="expanded"
+)
+
+################################################################################
+# CUSTOM CSS - IPB BRANDING
+################################################################################
+st.markdown("""
+<style>
+.main {
+    background-color: #f8f9fa;
+}
+h1, h2, h3 {
+    color: #006633;
+    font-family: 'Arial', sans-serif;
+    font-weight: bold;
+}
+.stButton>button {
+    background-color: #006633;
+    color: white;
+    border-radius: 10px;
+    padding: 10px 20px;
+    font-weight: bold;
+}
+.stMetric {
+    background-color: #FFCC00;
+    padding: 15px;
+    border-radius: 8px;
+    box-shadow: 2px 2px 5px rgba(0,0,0,0.1);
+}
+</style>
+""", unsafe_allow_html=True)
+
+################################################################################
+# DATA GENERATOR - TAHUN 2025
+################################################################################
+def generate_realtime_data():
+    """Generate data real-time 2025"""
+    np.random.seed(42)
+    date_range = pd.date_range(start='2025-01-01', periods=30, freq='D')
+    return pd.DataFrame({
+        'date': date_range,
+        'cac': np.random.randint(15000, 21000, 30),  # Naik 12.5%
+        'cvr': np.random.uniform(1.8, 2.8, 30),      # Lebih tinggi
+        'new_customers': np.random.randint(800, 1100, 30),
+        'marketing_spend': np.random.randint(4000000, 5000000, 30),
+        'revenue': np.random.randint(14000000, 20000000, 30)
+    })
+
+def generate_umkm_data():
+    """Generate data UMKM 2025"""
+    np.random.seed(123)
+    
+    # Parameter 2025 (naik karena inflasi & pertumbuhan)
+    cac_base = 13500
+    clv_base = 50000
+    revenue_base = 5500000
+    
+    tiers = ['Tier 1']*10 + ['Tier 2']*29 + ['Tier 3']*39 + ['Tier 4']*20
+    products = ['Sate Padang', 'Paragede Jaguang', 'Pisang Kapik', 'Teh Talua', 'Ayam Geprek', 'Martabak', 'Nasi Kapau', 'Bubur Kampiun']
+    
+    df = pd.DataFrame({
+        'umkm_id': range(1, 99),
+        'nama_umkm': [f"UMKM_{i:02d}_{np.random.choice(products)}" for i in range(1, 99)],
+        'pemilik': [f"Pemilik_{i}" for i in range(1, 99)],
+        'tier': tiers,
+        'produk_utama': np.random.choice(products, 98),
+        'alamat': [f"Jl. Pasar Lama No.{i}" for i in range(1, 99)],
+        'whatsapp': [f"0821-6789-{i:04d}" for i in range(1, 99)],
+        'instagram': [f"@umkm_{i:02d}" for i in range(1, 99)],
+        'landing_speed': np.random.uniform(1.5, 6.5, 98),
+        'trust_signal': np.random.choice([0, 0.5, 1], 98, p=[0.15, 0.25, 0.6]),
+        'urgency_factor': np.random.choice([0, 1], 98, p=[0.5, 0.5]),
+        'local_review': np.random.uniform(3.8, 4.95, 98),
+        'visual_quality': np.random.uniform(0.5, 1.0, 98),
+        'cac': [cac_base + i*250 for i in range(98)],
+        'clv': [clv_base - i*180 for i in range(98)],
+        'cvr': [2.8 - i*0.012 for i in range(98)],
+        'revenue_7days': [revenue_base + i*60000 for i in range(98)],
+        'lat': np.random.uniform(-0.4640, -0.4650, 98),
+        'lon': np.random.uniform(100.4000, 100.4010, 98)
+    })
+    
+    # 🔧 FIX: Tambahkan status dan color mapping
+    df['status'] = df.apply(
+        lambda row: '🟢 Aktif' if row['cac'] < row['clv']/3 else 
+                    ('🟡 Perlu Perhatian' if row['cac'] < row['clv'] else '🔴 Non-Aktif'),
+        axis=1
+    )
+    
+    color_map = {
+        "Tier 1": "#006633",
+        "Tier 2": "#FFCC00", 
+        "Tier 3": "#FF8C00",
+        "Tier 4": "#DC143C"
+    }
+    df['color'] = df['tier'].map(color_map)
+    
+    return df
+
+################################################################################
+# CALCULATION FUNCTIONS
+################################################################################
+def calculate_predicted_cvr(speed, trust, urgency, review, visual):
+    BETA = {'beta0': 2.1, 'beta1': -0.21, 'beta2': 0.35, 'beta3': 0.18, 'beta4': 0.42, 'beta5': 0.28}
+    cvr = (BETA['beta0'] + BETA['beta1']*speed + BETA['beta2']*trust + 
+           BETA['beta3']*urgency + BETA['beta4']*0.1*review + BETA['beta5']*visual)
+    return max(0.5, min(5.0, cvr))
+
+################################################################################
+# PAGE FUNCTIONS
+################################################################################
+def dashboard_page():
+    st.title("📊 DASHBOARD MONITORING REAL-TIME 2025")
+    st.subheader("Pasar Kuliner Padang Panjang - 98 UMKM")
+    
+    realtime_data = generate_realtime_data()
+    umkm_data = generate_umkm_data()
+    
+    # KPI Cards
+    col1, col2, col3, col4 = st.columns(4)
+    
+    with col1:
+        st.metric("CAC Rata-rata", f"Rp {umkm_data['cac'].mean():,.0f}", delta="🔼 +12.5% vs 2024", delta_color="inverse")
+    
+    with col2:
+        st.metric("CVR Pasar", f"{umkm_data['cvr'].mean():.2f}%", delta="🔼 +13.3% vs 2024")
+    
+    with col3:
+        st.metric("Pelanggan Baru", f"{98*250:,}", delta="🔼 +6.7% vs 2024")
+    
+    with col4:
+        roas = (umkm_data['revenue_7days'].sum() / (umkm_data['cac'].sum() * 250))
+        st.metric("ROAS Kolektif", f"{roas:.1f}x", delta="🎯 Target 3.5x")
+    
+    # Tabs
+    tab1, tab2, tab3 = st.tabs(["📈 Tren Harian", "🎯 Segmentasi Tier", "📍 Peta Sebaran"])
+    
+    with tab1:
+        fig = go.Figure()
+        fig.add_trace(go.Scatter(
+            x=realtime_data['date'],
+            y=realtime_data['cac'],
+            mode='lines+markers',
+            name='CAC Harian 2025',
+            line=dict(color='#006633', width=3)
+        ))
+        fig.add_hline(y=16600, line_dash="dash", line_color="red", 
+                     annotation_text="Target Max: Rp 16.600")
+        st.plotly_chart(fig, use_container_width=True)
+    
+    with tab2:
+        col_left, col_right = st.columns(2)
+        
+        with col_left:
+            tier_counts = umkm_data['tier'].value_counts()
+            fig = px.pie(
+                values=tier_counts.values,
+                names=tier_counts.index,
+                title="Sebaran UMKM per Tier 2025",
+                color_discrete_map={
+                    "Tier 1": "#006633", "Tier 2": "#FFCC00", 
+                    "Tier 3": "#FF8C00", "Tier 4": "#DC143C"
+                }
+            )
+            st.plotly_chart(fig, use_container_width=True)
+        
+        with col_right:
+            profitability = umkm_data.groupby('tier').agg({
+                'cac': 'mean',
+                'clv': 'mean'
+            }).reset_index()
+            profitability['ratio'] = profitability['cac'] / profitability['clv']
+            
+            fig = px.bar(
+                profitability,
+                x='tier',
+                y='ratio',
+                title="Ratio CAC/CLV per Tier 2025 (Threshold: 0.33)",
+                color='ratio',
+                color_continuous_scale='RdYlGn_r'
+            )
+            fig.add_hline(y=0.33, line_dash="dash", line_color="red")
+            st.plotly_chart(fig, use_container_width=True)
+    
+    with tab3:
+        # 🔧 FIX: Gunakan kolom 'color' yang sudah di-map
+        st.map(umkm_data[['lat', 'lon', 'color']].dropna(), 
+               color='color', 
+               size=20,
+               zoom=13)
+    
+    st.success("✅ Data berhasil diupdate untuk tahun 2025! CAC rata-rata naik 12.5%, CVR naik 13.3%")
+
+def cac_monitor_page():
+    st.title("💰 CUSTOMER ACQUISITION COST (CAC) MONITOR 2025")
+    st.subheader("Real-time tracking efisiensi biaya perolehan pelanggan")
+    
+    umkm_data = generate_umkm_data()
+    
+    col1, col2, col3 = st.columns(3)
+    with col1:
+        tier_filter = st.multiselect("Filter Tier", options=umkm_data['tier'].unique(), default=umkm_data['tier'].unique())
+    with col2:
+        cac_threshold = st.slider("CAC Max Threshold (Rp)", min_value=10000, max_value=50000, value=20000, step=1000)
+    with col3:
+        sort_by = st.selectbox("Sortir berdasarkan", ["CAC", "CLV", "Ratio CAC/CLV"])
+    
+    filtered_data = umkm_data[umkm_data['tier'].isin(tier_filter)]
+    filtered_data['ratio'] = filtered_data['cac'] / filtered_data['clv']
+    
+    problematic = filtered_data[filtered_data['cac'] > cac_threshold]
+    if len(problematic) > 0:
+        st.error(f"⚠️ **{len(problematic)} UMKM melebihi threshold CAC!**")
+    
+    col_left, col_right = st.columns([2, 1])
+    
+    with col_left:
+        fig = go.Figure()
+        for tier in filtered_data['tier'].unique():
+            tier_data = filtered_data[filtered_data['tier'] == tier]
+            color_map = {"Tier 1": "#006633", "Tier 2": "#FFCC00", "Tier 3": "#FF8C00", "Tier 4": "#DC143C"}
+            fig.add_trace(go.Scatter(
+                x=tier_data['clv'], y=tier_data['cac'], mode='markers',
+                name=tier, marker=dict(size=10, color=color_map[tier], opacity=0.8)
+            ))
+        fig.add_hline(y=16666, line_dash="dot", line_color="green")
+        st.plotly_chart(fig, use_container_width=True)
+    
+    with col_right:
+        st.metric("CAC Rata-rata", f"Rp {filtered_data['cac'].mean():,.0f}")
+        st.metric("CLV Rata-rata", f"Rp {filtered_data['clv'].mean():,.0f}")
+        st.metric("UMKM Profitabel", f"{len(filtered_data[filtered_data['ratio'] < 0.33])} unit")
+        
+        st.subheader("🏆 Top 10 UMKM (CAC Terendah)")
+        st.dataframe(filtered_data.nsmallest(10, 'cac')[['nama_umkm', 'cac', 'tier']], use_container_width=True)
+
+def cvr_optimizer_page():
+    st.title("📈 CONVERSION RATE OPTIMIZER 2025")
+    st.subheader("Simulator & Rekomendasi peningkatan konversi")
+    
+    umkm_data = generate_umkm_data()
+    
+    st.sidebar.subheader("🔧 Simulator Optimasi")
+    selected_umkm = st.sidebar.selectbox("Pilih UMKM", options=umkm_data['nama_umkm'].tolist(), index=0)
+    umkm_data_selected = umkm_data[umkm_data['nama_umkm'] == selected_umkm].iloc[0]
+    
+    speed = st.sidebar.slider("Landing Page Speed (detik)", 1.0, 10.0, float(umkm_data_selected['landing_speed']))
+    trust = st.sidebar.slider("Trust Signal (0-1)", 0.0, 1.0, float(umkm_data_selected['trust_signal']))
+    urgency = st.sidebar.slider("Urgency Factor (0-1)", 0.0, 1.0, float(umkm_data_selected['urgency_factor']))
+    review = st.sidebar.slider("Local Review Score", 1.0, 5.0, float(umkm_data_selected['local_review']))
+    visual = st.sidebar.slider("Visual Quality", 0.0, 1.0, float(umkm_data_selected['visual_quality']))
+    
+    predicted_cvr = calculate_predicted_cvr(speed, trust, urgency, review, visual)
+    current_cvr = umkm_data_selected['cvr']
+    
+    col1, col2 = st.columns([1, 2])
+    
+    with col1:
+        st.metric("CVR Saat Ini", f"{current_cvr:.2f}%")
+        st.metric("CVR Terprediksi", f"{predicted_cvr:.2f}%")
+        
+        improvement = ((predicted_cvr - current_cvr) / current_cvr) * 100
+        if improvement > 0:
+            st.success(f"📈 Potensi peningkatan: +{improvement:.1f}%")
+        else:
+            st.error(f"📉 Risiko penurunan: {improvement:.1f}%")
+        
+        st.subheader("💡 Rekomendasi")
+        recommendations = []
+        if speed > 2.5: recommendations.append("⚠️ Turunkan speed ke <2.5 detik")
+        if trust < 1.0: recommendations.append("✅ Tambah trust badge")
+        if urgency == 0: recommendations.append("🔥 Aktifkan urgency")
+        if review < 4.5: recommendations.append("⭐ Tingkatkan review")
+        
+        for rec in recommendations:
+            st.info(rec)
+    
+    with col2:
+        st.subheader("📊 Analisis Sensitivitas")
+        speed_range = np.linspace(1.0, 6.0, 20)
+        trust_range = np.linspace(0, 1, 20)
+        z = np.array([[calculate_predicted_cvr(s, t, urgency, review, visual) for t in trust_range] for s in speed_range])
+        
+        fig = go.Figure(data=go.Heatmap(
+            z=z,
+            x=[f"{t:.1f}" for t in trust_range],
+            y=[f"{s:.1f}" for s in speed_range],
+            colorscale='RdYlGn',
+            hovertemplate="Speed: %{y}s<br>Trust: %{x}<br>CVR: %{z:.2f}%<extra></extra>"
+        ))
+        fig.update_layout(title="Sensitivitas: Speed vs Trust Signal")
+        st.plotly_chart(fig, use_container_width=True)
+
+def mta_analysis_page():
+    st.title("🎯 MULTI-TOUCH ATTRIBUTION ANALYSIS 2025")
+    st.subheader("Customer Journey & Channel Contribution")
+    
+    channels = {
+        'Instagram': {'reach': 175000, 'weight': 0.35, 'multiplier': 1.3},  # 2025: reach naik
+        'TikTok': {'reach': 220000, 'weight': 0.30, 'multiplier': 1.2},
+        'Google Maps': {'reach': 115000, 'weight': 0.25, 'multiplier': 1.1},
+        'Influencer': {'reach': 105000, 'weight': 0.40, 'multiplier': 1.3},
+        'WhatsApp': {'reach': 160000, 'weight': 0.20, 'multiplier': 1.0},
+        'Offline': {'reach': 50000, 'weight': 0.15, 'multiplier': 1.0}
+    }
+    
+    total_weighted = sum(v['reach'] * v['weight'] * v['multiplier'] for v in channels.values())
+    for k, v in channels.items():
+        v['contribution'] = (v['reach'] * v['weight'] * v['multiplier']) / total_weighted * 100
+    
+    st.subheader("📊 Channel Attribution Breakdown")
+    
+    fig_sunburst = go.Figure(go.Sunburst(
+        labels=list(channels.keys()) + ['Total'],
+        parents=['']*len(channels) + [''],
+        values=[v['contribution'] for v in channels.values()] + [100],
+        branchvalues="total"
+    ))
+    fig_sunburst.update_layout(title="Multi-Touch Attribution - Customer Journey", height=500)
+    st.plotly_chart(fig_sunburst, use_container_width=True)
+    
+    col_left, col_right = st.columns(2)
+    
+    with col_left:
+        fig_bar = px.bar(
+            x=list(channels.keys()),
+            y=[v['contribution'] for v in channels.values()],
+            color=[v['contribution'] for v in channels.values()],
+            title="Kontribusi per Channel (%)"
+        )
+        fig_bar.update_layout(xaxis_tickangle=-45)
+        st.plotly_chart(fig_bar, use_container_width=True)
+    
+    with col_right:
+        mta_df = pd.DataFrame.from_dict(channels, orient='index')
+        mta_df['contribution'] = mta_df['contribution'].round(1)
+        st.dataframe(mta_df, use_container_width=True)
+
+################################################################################
+# MAIN APP
+################################################################################
+def main():
+    with st.sidebar:
+        st.image("https://upload.wikimedia.org/wikipedia/id/0/0c/Logo_IPB_University.png", width=150)
+        st.title("🧭 Menu Navigasi 2025")
+        
+        menu = st.radio(
+            "Pilih Halaman:",
+            ["📊 Dashboard Utama", 
+             "💰 CAC Monitor",
+             "📈 CVR Optimizer", 
+             "🎯 MTA Analysis"],
+            index=0
+        )
+        
+        st.markdown("---")
+        st.success("🎉 Data sudah update untuk tahun 2025!")
+    
+    if menu == "📊 Dashboard Utama":
+        dashboard_page()
+    elif menu == "💰 CAC Monitor":
+        cac_monitor_page()
+    elif menu == "📈 CVR Optimizer":
+        cvr_optimizer_page()
+    elif menu == "🎯 MTA Analysis":
+        mta_analysis_page()
+
+if __name__ == "__main__":
+    main()`,
+"data/logo.png": qu("iVBORw0KGgoAAAANSUhEUgAAAMAAAADACAYAAABS3GwHAAAACXBIWXMAAAEQAAABEAEExGftAAAAGXRFWHRTb2Z0d2FyZQB3d3cuaW5rc2NhcGUub3Jnm+48GgAAETJJREFUeJzt3X1wXNV5x/Hvc1cvlnYtyYCxZV5nmoBjAQZLDklnOi1MmIItYzueaFrSaZNMGk87aTqTZGIHU6+XF3cKKc2QNgkwU0jSgOMYv0iyjGMHGoKLsS1IADskmZIm+F1+tyQkr/Y+/WN3hWwkS1rt7tnd+3xmPGhXd7XPDOe355x7zz0rqooxQeW5LsAYlywAJtAsACbQLAAm0CwAJtAsACbQLAAm0CwAJtAsACbQLAAm0CwAJtAsACbQLAAm0CwAJtAsACbQLAAm0CwAJtAsACbQLAAm0CwAJtAsACbQLAAm0EovAEuXlrN8ea3rMkxxkJLcF2jVqicRmY9qJyKd+H4nAwN7eOihQ65LM4WlNAOwdGk5M2ZsQ/VPz3te5CSwbzAYiUQnodCviEZ9N4Ua10ozAAArVkyjvHwXcPUoR55B5M1UKPYC+zh+fDePPdafhyqNY6UbAIBY7GbgZVTD43qdSBzV3w4OnzyvE3iNaLQ3J3UaZ0o7AADR6GJE1jHRCb9IAtVfD/YSvt9JPL6T1au7slKncaL0AwAQi61ENZaTvy1y6LzJtuftJRp9JyfvZbIuGAEQEVat+iGqf5mn97PJdpEIRgAAvvzlKmpq/hv4qJP3FzkLvGGT7cISnAAArFhRT0XFblSvcF0KYJPtAhCsAACsXNmI570EVLsuZVjJyfbvgX2DwbDJds4ELwAA0eingB8hIq5LGTObbOdEMAMAEIutRvXrrsuYEJEjwGvAHny/k0RiDw8+eMB1WcUkyAHwgPWoLnRdSlalewrVXXjeDmAX0Wi367IKVXADALBs2WSqq3egeqPrUnJGJEHy7NMORF4BXiYa/YPrsgpFsAMAcN9911BWtgu43HUpefQOsB3V7cTjL7B69XHXBbliAQBYufJP8LztQIXrUhzwSc4jtiOyhb17d7B2bcJ1UfliAUiLxT6D6lOuy3BO5DjQge//GM/bSjR6znVJuWQBGCoW+yaq/+i6jIIhchLVNkSeAzqIRgdcl5RtFoChWlpCNDRsQnW+61IK0GFEvsfAwOM88MDvXBeTLRaAC8ViNcD/oNrgupQC5QMvoPoEnreh2HsFC8BwYrHrgJ2oTnFdSoH7A6qPcvbsEzz66Huui8mEBWAk0egdiHQAZa5LKQKHEXkE+DbRaJ/rYsaj9LZFyZZYbBsiX3FdRpGYjuq/Ar8hFvvrYlpjZT3AaFatehz4gusyiswLJBKfL4bJsvUAozl06IuI/Mx1GUXmdkKhN4hG/67QewPrAcYiFrsE1VeBD7kupQitpafnczzySI/rQoZjARirlSsbCIVeQXWy61KKjsgviccX8OCD77ou5UI2BBqr++/fC7SkVlea8VCdTXn5z4nFrnVdyoUsAOMRjT4P3Ou6jKKkeg2wnRUr6l2XMpQFYLyi0YeB/3RdRlFS/SPKy9eydGm561LSLACZEFkKdLguo8gMkLxgVsv06Z90XUyaTYIzFYtVk7yp5OOuS3GoDziYug3zZGpDsIP4/iE87yS+fxLVg4RCh9i790gh3mdgAZiIWOxyVH8OXOe6lCw5hkgXcAzVLuDw4HO+34Vq8nEolDymBHa6swBMVDIEm4Em16UM41Rq54h0gz4KHB1s5L5/BNWjQxp0Ua/szIQFIBuS2y4+DPw9uZ1XdZMcR3elGvSxwcfJBp38lH6/QZf03VzZYAHIpljsJlSXIbJgjBfMekl+Ih8Z0qCPDn5qJxv0UXz/KOXlXcW20rIYWABy4UtfqqSu7gZEZuJ5l5K82T7doI/h+4dTDdr2AHXMAmACza4DmECzAJhAswCYQLMAmECzG75NyemeN28qnneZwmUCU4HpHlwGTFXVqYhMI/m4x84CmcLX0lLV298/hUSiHpEZClOAKajWIzJj8GeYQbJhj2m1qcKT1gOY/BtDgxbVKT7UC1zF0AZ94Qf2xD7At1kPYCZufA36SgpjF+5EYmDgcusBzAdNpEGP8AmtQIFtD9FZ8/zzJywAQRCMBj0uCtvAzgIVJ2vQE+d5FoCCkWrQvuoU8f3BRqypRi0iM0R1SqqhXwnUDL7WGnQmeiIDAzvBApAbGTbowQabasRDH9upiiwSeZGOjn6wAIzN+Br0FUAtWIMuVOr729I/BzMA1qCDTWQwAKVxHWB8DXoGUOe4YuPOgXB7+5XpB4XZA2TYoO0T2oxK9SdDH+YnALfdNqm3puYSP9VoxffrJXX6TpKn7OqB90/nQT1YgzY5sW3og4kHoKmpvHv69A8BHxGRq4ArUguTrgamA1cQDodJJBDOb8Tpn60xmzzxVXX70CfGNwdoaQn19vTcoiJ/JiIfU9VZJPfML5i9Ho0Zkcjr4ba2OUOfGr0HaGkJ9fb23gl8TuF2ROoASmLybILlgvE/XCwATU3lPfX1/5D65vSrc1mXMXkx5PRn2rABONvc/Mfe9OnfRfXG3FdlTF70hru7d1z45AcC0LNgwac9eAob15vS8hIvvviBnfXOuym+e8GCL6L6A6zxm9KzfbgnB3uAnubmTwh8E1tEaErRMBNgSJ0G7bvrrmsToVAncEmeyzImHw6FN2++YrhTlx4ikgiFnsQavylVqttGOm/v9TQ3fwb4RH4rMiaPhjn9meap6rUCO4CzeSzJmHxRLlj+MNR5SyF6Fy6cge83+tDoqc5SaAA+gk2MTbFSfSO8efPskX593nWA6k2bDgIHgbb0cyfvuKO2rKrqRk+1UVVnedCg0AhMylnRxmSLyLBnfwZ/ndGanqam8u4ZM64T1UZUZyHSgOqtJPdhNKZweN6fh1tbRwxBVu8ISw+h9P1QNAIzsV2ojRt9Yc+7lNbWEb+KKue3RJ6YN6+mvKzsppDvz1KRBlFtVJgDVOX0jY2B7eH29jsudkDO7wi7pKPjDPBy6l/SbbeVdU+efD2+PwuRBoFGVOcC03JdjwmQi5z+HDykkNb19y5cOEMTieTwKRkKG0KZjInvz6nu6Hj9oscUUgCG09XSEgn39l6vqVCkhlA3A2HXtZmCdiw8d+40olH/YgcVfACG1dIS6u/tvSYh0uBDo7zfW9S7Ls0UCJFnwm1tnx71sKIMwAhONzdP8TyvwUuGIR2K64GQ49JMvql+Nrx589OjHVZSARhWS0tFd1/fhyUVitR/ZytEXJdmcscrK7u6auPGd0c7rvQDMAJb9lHS9oXb2xvGcmBh7gyXB8Mt+zi1eHFdKJG44YJlH01ApbNCTSYuuvxhqMD2AGM2b15lr+fdQPLM02yF2ST/1botzIxEfH9edUfHljEdawHIzAjLPmwI5V5PuKfnsuFugB+OBSCLbNmHewqbIu3ti8Z6vAUg15IbjM0CZqN6cz9yVwidGdjJV46JyBeq29qeHPPxFoA8EvG2zV98+qxKpBIlghJGqcWnBiUsauOniVFP5KqqtrYDY32BfRDl0c7mxY+f9SUC0I/Qj3AcSF+nCylMxmfykGBMFrWreGPXOZ7GDxaAvOlcsqT+mC+fvdgxCeAUHqeGPCcKYXzCvB+OOvEL4qvWC42oto/3NRaAPOnr9zecwxv3h7kC3Xh0A0fSi2IVbAj1QQnfXzPe11gA8qCzeeFtXVp2azb/pg2hzqciOydv2fLr8b7OApAHpzS05qJrcrMkyEMoT/WpTF5nAcixzuZFy04TutzV+wdkCHWyOh7/YSYvtADk0L6WlkgX3v2u6xjOSEOoMEokFYgiGkI9wdatPZm80AKQQ2feiz/bq17RjDYSwBmEM4Q4mHqu0IdQAt1+PP5opq+3AOTIG83NNxzVivmu65iokYZQkwQmq0+NKFM1QY2j4ZMPj0a2bj2a6estADlyivL1A0iRDqlH16fQh0eXwv8SokKVqaJMJ8Gl+PkKw/9F4vGHJ/IHLAA50Nn8yb85rt6HXdeRT+cQDqhwAI9yYDoJrpYEkdx9C7QP/G2mY/80224k20S84/CtIK+wigPvEmKHVvAqFXTloJmpyAPh9vYRd30eK+sBsmz3/EXf6VaZ7LqOQnFKhdcopxafmQxQJ1n5aFgTaWrKytk1Ww2aRZ1LltQf6mf/ObWedSRXis9M4hmfWhVYX3348F+wZ088G/XY/6gs6uvT9db4L26/euzScs5lNk3+RvXcuZ/KVuMH6wGyZs/8hXfsp+wn+VjyUApq8fmoxMf6adEl8Pnq9vbWbNdhn1ZZcla8H1jjH7vTeLyrow6Ezik8ob7fkIvGDzYJzopd8+6+96SU287W49SFxzUkhvuVCqwLwfLK9vZ3clmDBWCC9rW0RE54ZdHcne4uXWUfnAacVXgWz3ss3Nq6Ny815ONNStnpnvgzvRTPep9CcqUm0pvI/EpV/6OvrOz7l23alNdvK7VJ8AT88s47G34fqn6zlJc85IIAMxnou9rzf4zq98ObN/90pC+yzjXrASbgVKhqgzX+sRPgUvxjV6n/WCRS+W/htWu7XddkAcjQa80L/+oEZYFa75OpSehALeypCbH8xtYNP3Ndz1A2BMqEiLdt3qKTZ/FqXJdSqMpRrRV+Vy36eFP7xm+gWpBnia0HyMDu+Yu+c1at8V9IgBr0RI3oulovseK61tZjrmsajfUA49S5ZEn9oT7ePWffOjMojN9f6/FCxYC/fM6WTW+4rmc8rAcYp0z39yk15ajWom9HxF89p33Tf7muJ1MWgHHIxf4+xcQDakSPRPCfCR3272vcM/I3sBcLC8A4nCb0bEHO5HIsjPbWCFunVLB85vr1v3FdTzZZAMaos3nRslMaCsx6n0o0UQe7IzoQnd3ROuavHCo2Ngkeg86mu6u7pped7FUp6SUPHlCL7o+gT4fD5Q/MWrv2nOuacs16gDE4Ny20plQbvwAR/DM1Qiuhqq/euumZI65ryifrAUbx+ifmzdpfOemteIkteagWPVej+kpVmbfylk3PveS6HlesBxjFmcrKjaXS+MtUtU707bDovzdu3vTdQr06m08WgIv4xd2L7jlBqKjX+wy9OhsOl3991tq1J1zXVEhsCDSSIl/vk746W63xr93U3v6W63oKlfUAIyjG9T4Vgl+LvlmVGPiXpi2tz7qupxhYDzCMVxfeM61roP9AMaz38VBqhCMR/Gcu7zl977Vj/IJok2Q9wDAGBvo2nkMKuvGnr85WTfKW3bxu3W9d11OsLAAX6GxeeFsXZR9zXcdwKoVEneruCl/vm7tlw09d11MKLAAXKLT1PmWo1hXBjSXFygIwRKGs9xl6dbYqLl+5aev6jL8AwlycTYJTCmG9TzXaX4PuDPuJ+2ZvaX3ZVR1BYj1Aiqv1PmWgdfjJq7PtG7+d7/cPOusByP96n/TV2cnify9SXbFyVgFsDxJU1gMA3ZMqN8Q1940/fXW28r3+r96yvWNfrt/PjC7wAfjF3YvuOaah63L19ysgUSv6VtiP//OcjrYf5ep9TGaCPQTK0XofD6UW9kfQp6f2nnrIrs4WrkD3ANle7xNGe+tE1/sysPzjbW0HsvV3Te4EtgfI1nqf9LZ/kyRxb2P7phezVZ/Jj8D2ABNZ71Ms2/6Z0QUyAJms9xl6Y0llXP7Jrs6WhkAGYDzrfYp52z8zusAFYM+CxV87pd5F1/ukt/2zq7OlL1CT4M6mu6uPTis7+R4fXPJQitv+mdEFqgc4Ny205sLGn76xpMLz7m1sfe5tV7UZNwLTAwxd71OJJmqEt6p8/8Gmjo3rXNdm3AlMD9BdWbkmAgci+IHZ9s+MLjABmBZK3F4M31hi8iswQyBjhuO5LsAYlywAJtAsACbQLAAm0CwAJtAsACbQLAAm0CwAJtAsACbQLAAm0CwAJtAsACbQLAAm0CwAJtAsACbQLAAm0CwAJtAsACbQLAAm0CwAJtAsACbQLAAm0P4f64/KZ9tb4CAAAAAASUVORK5CYII="),
+"pages/🎈_subpage.py": `import streamlit as st
+
+st.title("Sub page")
+
+st.markdown("""
+_Stlite_ supports **Multi Page Apps (MPA)**, of course!
+
+Create \`pages/*.py\` like this file to add new pages.
+
+If you are new to MPA, read the official tutorial about it [🔗 here](https://docs.streamlit.io/library/get-started/multipage-apps)
+""")
+`,
+
+},
+  },
+  document.getElementById("root")
+)
+
+function qu(n){const a=window.atob(n),i=a.length,l=new Uint8Array(i);for(let u=0;u<i;u++)l[u]=a.charCodeAt(u);return l}
+    </script>
+  </body>
+  <!-- Generated from Stlite Sharing (https://edit.share.stlite.net/), and the source version is 0a2869591476f9de8bbf53020b3168312cc3864a -->
+</html>
